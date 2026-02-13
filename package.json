@@ -1,0 +1,24 @@
+{
+  "name": "testproject",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/abdullahabrar08/TestProject#readme",
+  "bugs": {
+    "url": "https://github.com/abdullahabrar08/TestProject/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abdullahabrar08/TestProject.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
