@@ -1,6 +1,6 @@
 name: Docker Deployment
 
-# Trigger on push to main and PR merges
+# Trigger workflow
 on:
   push:
     branches:
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Setup Node (optional if building locally)
+      # Step 2: Setup Node (optional if needed for local build)
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 4: Build Docker image with SHA tag and latest tag
+      # Step 4: Build Docker image with commit SHA + latest tag
       - name: Build Docker image
         run: |
           docker build \
@@ -54,26 +54,29 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
+          envs:
+            SHA: ${{ github.sha }}
           script: |
             echo "Deploying Docker container..."
 
-            # Pull new image with commit SHA
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${GITHUB_SHA}
+            # Pull the exact commit SHA image
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:$SHA
 
-            # Run new container with SHA tag and env file
-            docker run -d \
-              --name test-backend-${GITHUB_SHA} \
-              -p 3000:3000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${GITHUB_SHA}
-
-            # Wait a few seconds to ensure container starts
-            sleep 5
-
-            # Stop and remove old container
+            # Stop and remove old container if exists
             docker stop test-backend || true
             docker rm test-backend || true
 
-            # Rename new container to standard name
-            docker rename test-backend-${GITHUB_SHA} test-backend
+            # Remove dangling images
+            docker image prune -f
+
+            # Run new container in detached mode
+            docker run -d \
+              --name test-backend \
+              -p 3000:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:$SHA
+
+            # Wait a few seconds and check if container is running
+            sleep 5
+            docker ps
 
             echo "Deployment completed successfully!"
