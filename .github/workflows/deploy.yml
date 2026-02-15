@@ -1,6 +1,5 @@
 name: Docker Deployment
 
-# Trigger workflow
 on:
   push:
     branches:
@@ -11,42 +10,34 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    # Only deploy if PR merged or push to main
     if: github.event.pull_request.merged == true || github.ref == 'refs/heads/main'
 
     steps:
-      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Setup Node (optional if needed for local build)
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      # Step 3: Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 4: Build Docker image with commit SHA + latest tag
       - name: Build Docker image
         run: |
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }} \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest .
 
-      # Step 5: Push both images to Docker Hub
       - name: Push Docker image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest
 
-      # Step 6: SSH into EC2 and deploy new container
       - name: SSH and Deploy on EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -54,8 +45,8 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
-          envs:
-            SHA: ${{ github.sha }}
+          envs: |
+            SHA=${{ github.sha }}
           script: |
             echo "Deploying Docker container..."
 
