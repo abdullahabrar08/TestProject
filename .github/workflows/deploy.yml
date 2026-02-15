@@ -16,11 +16,11 @@ jobs:
     if: github.event.pull_request.merged == true || github.ref == 'refs/heads/main'
 
     steps:
-      # Step 1: Checkout repo
+      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Setup Node (optional, needed if building locally)
+      # Step 2: Setup Node (optional if building locally)
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -33,17 +33,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 4: Build Docker image
+      # Step 4: Build Docker image with SHA tag and latest tag
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest .
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest .
 
-      # Step 5: Push Docker image to Docker Hub
+      # Step 5: Push both images to Docker Hub
       - name: Push Docker image
         run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest
 
-      # Step 6: SSH into EC2 and deploy
+      # Step 6: SSH into EC2 and deploy new container
       - name: SSH and Deploy on EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -53,15 +56,25 @@ jobs:
           port: ${{ secrets.EC2_PORT }}
           script: |
             echo "Deploying Docker container..."
-            # Pull latest image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest
 
-            # Stop old container if exists
+            # Pull new image with commit SHA
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${GITHUB_SHA}
+
+            # Run new container with SHA tag and env file
+            docker run -d \
+              --name test-backend-${GITHUB_SHA} \
+              --env-file /opt/test_server/TestProject/.env \
+              -p 3000:3000 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${GITHUB_SHA}
+
+            # Wait a few seconds to ensure container starts
+            sleep 5
+
+            # Stop and remove old container
             docker stop test-backend || true
             docker rm test-backend || true
 
-            # Run new container
-            docker run -d \
-              --name test-backend \
-              -p 3000:3000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest
+            # Rename new container to standard name
+            docker rename test-backend-${GITHUB_SHA} test-backend
+
+            echo "Deployment completed successfully!"
