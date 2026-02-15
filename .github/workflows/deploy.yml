@@ -10,7 +10,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Deploy only on push to main or merged PR
     if: github.event.pull_request.merged == true || github.ref == 'refs/heads/main'
 
     steps:
@@ -18,13 +17,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node (optional, if needed for build)
+      # 2️⃣ Setup Node (optional for builds)
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      # 3️⃣ Login to Docker Hub
+      # 3️⃣ Docker Hub login
       - name: Docker Hub Login
         uses: docker/login-action@v2
         with:
@@ -35,16 +34,17 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
+            --pull \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }} \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest .
 
-      # 5️⃣ Push both tags to Docker Hub
+      # 5️⃣ Push both tags
       - name: Push Docker image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${{ github.sha }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:latest
 
-      # 6️⃣ SSH to EC2 and deploy
+      # 6️⃣ SSH to EC2 and deploy container
       - name: SSH Deploy
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -55,25 +55,26 @@ jobs:
           envs: |
             SHA=${{ github.sha }}
           script: |
-            echo "Deploying Docker container with SHA: $SHA"
+            echo "Starting deployment for SHA: $SHA"
 
-            # Pull the exact SHA image
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:$SHA
-
-            # Stop & remove old container if exists
+            # Stop old container if exists
             docker stop test-backend || true
             docker rm test-backend || true
 
-            # Optional: remove dangling images to save space
+            # Remove old images to avoid cache issues
+            docker rmi -f $(docker images abdullah008/testproject-backend -q) || true
             docker image prune -f
 
-            # Run new container in detached mode
+            # Pull exact SHA image from Docker Hub
+            docker pull abdullah008/testproject-backend:$SHA
+
+            # Run container in detached mode
             docker run -d \
               --name test-backend \
               -p 3000:3000 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:$SHA
+              abdullah008/testproject-backend:$SHA
 
-            # Wait a few seconds and confirm it's running
+            # Wait a few seconds and confirm container is running
             sleep 5
             docker ps
 
