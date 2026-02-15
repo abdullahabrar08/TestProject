@@ -63,7 +63,6 @@ jobs:
             # Run new container with SHA tag and env file
             docker run -d \
               --name test-backend-${GITHUB_SHA} \
-              --env-file /opt/test_server/TestProject/.env \
               -p 3000:3000 \
               ${{ secrets.DOCKERHUB_USERNAME }}/testproject-backend:${GITHUB_SHA}
 
