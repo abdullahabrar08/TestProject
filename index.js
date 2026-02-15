@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 3000;
 app.get("/", (req, res) => {
   console.log("Received a request at /");
   res.send(
-    "Server alive & kicking with Docker Containers semantic versioning 🚀 ....",
+    "Server alive & kicking with Docker Containers semantic versioning 🚀 !!!",
   );
 });
 
